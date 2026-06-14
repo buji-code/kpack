@@ -92,7 +92,11 @@ function generate_kbld_config_ko() {
   ko_config_path=$2
   registry=$3
 
-  args=("--disable-optimizations")
+  # --platform=all forces ko to publish a multi-arch index (amd64+arm64 from the
+  # base). A single token (no comma) so it survives the space->comma rawOptions
+  # join below. (ko config defaultPlatforms alone wasn't honored by kbld's ko
+  # invocation — it recorded only the host-platform child.)
+  args=("--disable-optimizations" "--platform=all")
   args+=($buildArgs)
   args="${args[@]}";
 
