@@ -92,10 +92,7 @@ function generate_kbld_config_ko() {
   ko_config_path=$2
   registry=$3
 
-  # Build multi-arch images. Without --platform, ko defaults to linux/amd64
-  # only, so the published controller/webhook/etc. images don't run on arm64
-  # clusters (exec format error). KO_PLATFORMS lets callers override.
-  args=("--disable-optimizations" "--platform=${KO_PLATFORMS:-linux/amd64,linux/arm64}")
+  args=("--disable-optimizations")
   args+=($buildArgs)
   args="${args[@]}";
 
@@ -154,6 +151,13 @@ EOT
   prefix="github.com/pivotal/kpack/pkg/apis/build/v1alpha2"
   cat <<EOT > $ko_config_path
   defaultBaseImage: paketobuildpacks/run-jammy-tiny
+
+  # Publish multi-arch images. Without this, ko defaults to linux/amd64 only,
+  # so the published controller/webhook/etc. images can't run on arm64 clusters
+  # (exec format error). The base image (run-jammy-tiny) is multi-arch.
+  defaultPlatforms:
+  - linux/amd64
+  - linux/arm64
 
   builds:
   - id: controller

@@ -46,8 +46,6 @@ jobs:
         run: echo "${{ steps.reg.outputs.pass }}" | docker login "${{ steps.reg.outputs.host }}" -u "${{ steps.reg.outputs.user }}" --password-stdin
 
       - name: Build & push multi-arch (amd64 + arm64)
-        env:
-          KO_PLATFORMS: linux/amd64,linux/arm64
         run: |
           ./hack/local.sh --build-type ko --registry "${{ steps.reg.outputs.registry }}" --output release-multiarch.yaml
           echo "=== published image refs ==="
