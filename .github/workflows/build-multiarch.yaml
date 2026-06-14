@@ -1,0 +1,59 @@
+name: build-multiarch
+
+# Builds the kpack images multi-arch (amd64 + arm64) via the project's own
+# ko-based build (hack/local.sh) and publishes them. Default target is the
+# fork's GHCR (uses the built-in token). To target OCIR instead, set the repo
+# variable OCI_REGISTRY and secrets OCI_REGISTRY_USERNAME/OCI_REGISTRY_PASSWORD.
+on:
+  workflow_dispatch:
+  push:
+    branches: [arm64-multiarch]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: ko-build/setup-ko@v0.7
+      - uses: carvel-dev/setup-action@v2
+        with:
+          only: ytt, kbld
+
+      - name: Resolve registry
+        id: reg
+        run: |
+          if [ -n "${{ vars.OCI_REGISTRY }}" ]; then
+            echo "registry=${{ vars.OCI_REGISTRY }}/kpack" >> "$GITHUB_OUTPUT"
+            echo "host=$(echo '${{ vars.OCI_REGISTRY }}' | cut -d/ -f1)" >> "$GITHUB_OUTPUT"
+            echo "user=${{ secrets.OCI_REGISTRY_USERNAME }}" >> "$GITHUB_OUTPUT"
+            echo "pass=${{ secrets.OCI_REGISTRY_PASSWORD }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "registry=ghcr.io/${{ github.repository_owner }}/kpack" >> "$GITHUB_OUTPUT"
+            echo "host=ghcr.io" >> "$GITHUB_OUTPUT"
+            echo "user=${{ github.actor }}" >> "$GITHUB_OUTPUT"
+            echo "pass=${{ github.token }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Registry login
+        run: echo "${{ steps.reg.outputs.pass }}" | docker login "${{ steps.reg.outputs.host }}" -u "${{ steps.reg.outputs.user }}" --password-stdin
+
+      - name: Build & push multi-arch (amd64 + arm64)
+        env:
+          KO_PLATFORMS: linux/amd64,linux/arm64
+        run: |
+          ./hack/local.sh --build-type ko --registry "${{ steps.reg.outputs.registry }}" --output release-multiarch.yaml
+          echo "=== published image refs ==="
+          grep -E "image: .*(controller|webhook|build-init|build-waiter|rebase|completion)@sha256" release-multiarch.yaml || true
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-multiarch
+          path: release-multiarch.yaml

@@ -92,7 +92,10 @@ function generate_kbld_config_ko() {
   ko_config_path=$2
   registry=$3
 
-  args=("--disable-optimizations")
+  # Build multi-arch images. Without --platform, ko defaults to linux/amd64
+  # only, so the published controller/webhook/etc. images don't run on arm64
+  # clusters (exec format error). KO_PLATFORMS lets callers override.
+  args=("--disable-optimizations" "--platform=${KO_PLATFORMS:-linux/amd64,linux/arm64}")
   args+=($buildArgs)
   args="${args[@]}";
 
